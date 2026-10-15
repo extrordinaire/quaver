@@ -6,7 +6,7 @@ return ballad.partiture(function(p)
   local project = moonstone.project({ root = "." })
 
   local artifact = moonstone.registry.source_package(project, {
-    name = project.registry_name or project.name,
+    name = project.registry_name or "moonstone/quaver",
     version = project.version,
     description = project.description,
     readme = "REGISTRY_README.md",

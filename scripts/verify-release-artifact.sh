@@ -10,7 +10,7 @@ moon exec -- ballad play partiture.lua
 test -f "$archive"
 test -f "$artifact_dir/package.toml"
 test -f "$artifact_dir/README.md"
-grep -Fqx 'name = "quaver"' "$artifact_dir/package.toml"
+grep -Fqx 'name = "moonstone/quaver"' "$artifact_dir/package.toml"
 grep -Fqx "version = \"$expected_version\"" "$artifact_dir/package.toml"
 tar -tzf "$archive" | grep -Fq 'src/quaver.lua'
 tar -tzf "$archive" | grep -Fq 'src/quaver/optimizer.lua'
