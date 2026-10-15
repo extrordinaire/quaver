@@ -1,6 +1,26 @@
 # Quaver
 
-Quaver builds smaller Lua programs from an explicit module graph. Its first integration is Valua: keep the schema primitives a consumer needs, remove the remaining facade exports and unreachable modules, then minify without changing string literals or identifiers.
+Quaver builds smaller Lua programs from an explicit module graph. Its first integration is Valua: keep the schema primitives a consumer needs, remove the remaining facade exports and unreachable modules, then minify while preserving string literals and public identifiers.
+
+## Install
+
+Add the published package to your Moonstone project:
+
+```sh
+moon add moonstone/quaver
+moon exec -- lua -e 'print((require("quaver.minifier").minify("return 42")))'
+```
+
+The command prints `return 42`. For a fresh project, run `moon init . --name my-app --kind script --interpreter lua@5.4` first. `moon add` synchronizes the project environment automatically.
+
+For Ballad integration, also add Ballad as a tool:
+
+```sh
+moon add --tool moonstone/ballad
+moon exec -- ballad play partiture.lua
+```
+
+See [the Ballad guide](https://ballad.moonstone.sh/docs/quaver) for a complete recipe.
 
 Three independent entry points expose its passes:
 
