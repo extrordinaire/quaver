@@ -51,17 +51,9 @@ JSON rejection, and style serialization. Root and narrow imports produce the
 same output. Conservative builds preserve every supplied module byte-for-byte
 and withhold the requested mangle pass.
 
-Whole-site Strict builds currently fail with `QV102` at `hydronium.compat`:
-the compatibility API includes dynamic compilation (`load`) and diagnostic
-reflection. This is a real runtime boundary, even when the page only needs
-`unpack`. We do not mark it pure, stub it, or remove reflective APIs to obtain a
-better number. Selecting a Lua flavor alone does not prove those APIs unused.
-
-The useful next step is to separate tiny non-reflective runtime helpers from
-compilation/diagnostic facilities, then attempt export profiles on the resulting
-closed SSR graph. Quaver also needs scope-aware import diagnostics: its current
-lexical scanner can reject a public method named `require` even when it is not
-Lua module loading. Neither limitation should be hidden behind an assumption.
+On the released 0.7.0 checkout, reflective compatibility and integration paths
+block whole-site Strict builds. The follow-up below measures the capability split
+under review, rather than changing compiler assumptions to bypass those paths.
 
 ## Renderer-isolation follow-up
 
@@ -69,11 +61,24 @@ When the supplied checkout contains `hydronium_dom.server.renderer`, the runner
 also tests that explicit plain-renderer entrypoint and compares its output with
 the site-facing entrypoint. This capability split is under review in
 [Hydronium #29](https://github.com/moonstone-sh/hydronium/pull/29).
-The plain renderer excludes the lazy Meteorite adapter and Vite/manifest loading;
-its fixture loads 23 framework modules, totaling 73,236 compacted source bytes
-including the page, or 72,118 with JSON/style helper mangling.
+The plain renderer excludes the lazy Meteorite adapter and Vite/manifest loading.
+With explicit SVG lookup declarations, Quaver main now proves its Strict closure.
+This requires unreleased Quaver changes, including the member-name scanner and
+self-`__index` export proof; registry version 0.1.2 is not sufficient.
 
-With the named-member scanner correction in this branch, Strict dependency
-scanning passes those integration boundaries and stops at export proof for
-`hydronium_dom.server.html`: SVG lookup tables are built by initializer loops
-(`QV104`). This is not permission to assume the loops pure or to delete them.
+| Plain renderer artifact | Bytes |
+| --- | ---: |
+| Original loaded source + page | 154,346 |
+| Compacted loaded source + page | 74,230 |
+| Compacted + JSON/style mangling | 73,112 |
+| Strict mangled module files | 56,269 |
+| Strict standalone bundle | 57,454 |
+
+The Strict artifacts retain 25 modules, including the page and an explicit
+verification entry. They are emitted from the statically proved dependency graph,
+not from observed loads. Both files and bundle execute in isolated processes on
+Lua 5.4 and LuaJIT and match the original HTML, SVG, JSON, styles, and repeated
+renders. The bundle is approximately 62.8% smaller than the original fixture's
+loaded source, with the extra verification entry included. No consumer export
+profiles are supplied: unused features inside retained modules remain present.
+Root/site-facing imports still reject reflective compilation or Meteorite paths.

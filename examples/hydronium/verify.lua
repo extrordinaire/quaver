@@ -26,15 +26,21 @@ local temp=os.tmpname();os.remove(temp);assert(os.execute('mkdir -p '..quote(tem
 local worker=[=[
 local directory,variant=arg[1],arg[2]
 package.path=directory..'/?.lua;'..directory..'/?/init.lua;'..package.path
-local render=require('probe')
+local api
+if arg[3]=='bundle' then api=assert(loadfile(directory..'/bundle.lua'))()
+elseif arg[3]=='files' then api=require('fixture_entry') end
+local render=api and api.render or require('probe')
 local html=render('Hello <Hydronium>')
 assert(html:find('Hello &lt;Hydronium&gt;',1,true))
 assert(html:find('Lua &lt; HTML &amp; &quot;escaping&quot;',1,true))
 assert(html:find('q=a&amp;b=c',1,true))
 assert(html==render('Hello <Hydronium>'),'Render state leaked between calls')
-local json=require('hydronium_dom.server.json')
-local style=require('hydronium_dom.style')
+local json=api and api.json or require('hydronium_dom.server.json')
+local style=api and api.style or require('hydronium_dom.style')
+local element=api and api.element or require('hydronium.core.element')
+local server=api and api.server or require(variant=='renderer' and 'hydronium_dom.server.renderer' or 'hydronium_dom.server')
 local checks={html}
+checks[#checks+1]=server.render_to_string(element.h('svg',{},element.h('linearGradient',{strokeWidth=2}),element.h('feGaussianBlur',{})))
 for _,value in ipairs({'escaped " text','Unicode: λ','line\nbreak',''})do
  local encoded=json.encode({message=value});assert(json.decode(encoded).message==value)
  checks[#checks+1]=encoded
@@ -83,6 +89,33 @@ for _,variant in ipairs(variantNames)do
   end
   print(string.format('%s %s: %d loaded modules + page, %d Lua bytes, %d verified output bytes',variant,level,count,total,#html))
   records[variant..'-'..level]={bytes=total,html=html}
+ end
+ if variant=='renderer' and ok then
+  local modules={};for id,source in pairs(inventory)do modules[id]=source end
+  modules.fixture_entry=[[local render=require('probe')
+local element=require('hydronium.core.element')
+local server=require('hydronium_dom.server.renderer')
+local json=require('hydronium_dom.server.json')
+local style=require('hydronium_dom.style')
+return {render=render,element=element,server=server,json=json,style=style}]]
+  local artifact=q.build({entry='fixture_entry',modules=modules,mode='strict',minify={level='mangle'}})
+  for _,format in ipairs({'files','bundle'})do
+   local directory=temp..'/strict-'..format
+   local total,count=0,0
+   for _ in pairs(artifact.modules)do count=count+1 end
+   if format=='files' then
+    for id,source in pairs(artifact.modules)do
+     write(directory..'/'..id:gsub('%.','/')..'.lua',source)
+     total=total+#source
+    end
+   else
+    local source=q.bundle(artifact);write(directory..'/bundle.lua',source);total=#source
+   end
+   local success=os.execute(quote(executable)..' '..quote(temp..'/worker.lua')..' '..quote(directory)..' renderer '..format)
+   assert(success==true or success==0,'Strict '..format..' worker failed')
+   assert(read(directory..'/render.html')==baseline,'Strict '..format..' changed output')
+   print(string.format('renderer strict-%s: %d retained modules, %d artifact bytes (includes verification entry)',format,count,total))
+  end
  end
 end
 assert(records['broad-none'].html==records['narrow-none'].html,'Narrow imports changed HTML')
