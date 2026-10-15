@@ -3,7 +3,7 @@ manifest_version = 2
 [package]
 name = "quaver"
 registry_name = "moonstone/quaver"
-version = "0.1.2"
+version = "0.1.3"
 kind = "lib"
 description = "Modular Lua tree-shaker, minifier, and optimizer for Ballad"
 
