@@ -27,6 +27,7 @@ function M.render(result,options,inputs,hash)
   entry=result.entry,source_hashes=digests,output_hashes=outputs,hash_algorithm=hash and 'blake3' or 'not_recorded',
   minification=result.report.minification or {requested='none',applied='none'},before_minify_bytes=result.report.before_minify_bytes or result.report.output_bytes,
   input_bytes=result.report.input_bytes,analyzed_closure_bytes=result.report.analyzed_closure_bytes,analyzed_closure_modules=result.report.analyzed_closure_modules,output_bytes=result.report.output_bytes,
+  bundle_stats=result.report.bundle_stats or {},
   stages=result.report.stages or {},decisions=result.report.decisions or {},module_stats=result.report.module_stats or {},
   profiles=profiles,boundaries=options.boundaries or {},proofs=result.report.proofs,
   retained=result.report.retained,removed=result.report.removed,preserved=result.report.preserved or false,

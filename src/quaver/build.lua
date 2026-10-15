@@ -66,6 +66,7 @@ function M.build(options)
   if result.report.preserved and (minify_level~='none' or options.target_context or next(options.facades or {})) then
     result.report.diagnostics[#result.report.diagnostics+1]=diagnostic.new('QV202','Requested optimizations were withheld because their contracts are unproven.',nil,1,options.entry..'.lua','Conservative mode and runtime boundaries never grant extra assumptions.','Use an analyzable strict artifact for export selection or specialization.','note')
   end
+  result._mangle_target=context and context.target
   result.report.minification={requested=minify_level,applied=result.report.preserved and 'none' or minify_level}
   result.report.before_minify_bytes=result.report.output_bytes
   local total=0

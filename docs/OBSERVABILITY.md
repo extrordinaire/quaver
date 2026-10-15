@@ -62,3 +62,11 @@ Ballad saves failures to `.ballad/quaver-failures/<node-id>.lua` by default, ret
 If a report cannot be saved, the original compiler failure is still reported, with the persistence error as additional context. Errors during adapter hashing or filesystem emission retain completed compiler-stage information when available, but those adapter operations are not yet individually timed compiler passes. The CLI's directory creation currently requires a POSIX shell; Ballad's failure-directory creation uses its platform-aware process quoting.
 
 The three compiler APIs remain independently importable. Full pipeline traces come from the build orchestrator; standalone tree-shaker and optimizer calls retain their own existing reports and diagnostics rather than automatically creating a build trace.
+
+At the explicit `mangle` level, bundle emission also analyzes and minifies the
+assembled closure, including its generated private loader. `bundle_stats`
+records the assembled input bytes, emitted output bytes, and renamed bindings;
+the bundle stage repeats these counters. Module statistics remain per-module
+figures and do not include loader savings. Literal module keys and public export
+fields are preserved. Re-emission replaces the bundle stage rather than counting
+it twice.

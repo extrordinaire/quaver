@@ -30,6 +30,23 @@ test('stage records contain real byte reductions and binding counters',function(
  for _,event in ipairs(result.trace.events)do assert(event.status=='success'and event.elapsed_seconds>=0)end
  assert(result.trace.clock=='process_cpu_seconds')
 end)
+test('final emission mangles private loader names and preserves module keys',function()
+ local options={mode='strict',entry='app',modules={
+  app='local api=require("public.module");return function() return api.public_field,api.same end',
+  ['public.module']='return {public_field=42,same="public.module"}'}}
+ local plain=build(options);local plain_source=bundle(plain)
+ options.minify={level='mangle'}
+ local mangled=build(options);local source=bundle(mangled)
+ assert(not source:find('__quaver',1,true))
+ assert(source:find('public.module',1,true)and source:find('public_field',1,true))
+ local a,b=decode(plain_source)();local c,d=decode(source)()
+ assert(a==c and b==d and c==42 and d=='public.module')
+ assert(#source<#plain_source)
+ assert(mangled.report.bundle_stats.renamed_bindings>=4)
+ assert(decode(report.render(mangled)).bundle_stats.output_bytes==#source)
+ assert(mangled.report.bundle_stats.output_bytes==#source)
+ assert(mangled.report.bundle_stats.input_bytes>#source)
+end)
 test('deterministic contracts exclude timings and repeated emission is stable',function()
  local a,b=build(config()),build(config());bundle(a);bundle(b)
  assert(report.render(a)==report.render(b))

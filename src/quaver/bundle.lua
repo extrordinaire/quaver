@@ -33,8 +33,19 @@ function M.bundle(result)
   end
   out[#out+1]='return require('..string.format('%q',result.entry)..')'
   local source=table.concat(out,'\n')..'\n'
+  local before=#source
+  local renamed=0
+  if result.report.minification and result.report.minification.applied=='mangle' then
+    -- Emission introduces lexical bindings after the per-module passes. Analyze
+    -- the assembled closure so loader captures and embedded globals are proven
+    -- together; never rewrite module strings or exported table keys.
+    local stats
+    source,stats=require('quaver.minifier').minify(source,{level='mangle'},result._mangle_target)
+    renamed=stats.renamed_bindings
+  end
+  result.report.bundle_stats={input_bytes=before,output_bytes=#source,renamed_bindings=renamed}
   record.input_bytes=0;for _,bytes in pairs(result.modules)do record.input_bytes=record.input_bytes+#bytes end
-  record.output_bytes=#source;record.counters={modules=#result.report.retained}
+  record.output_bytes=#source;record.counters={modules=#result.report.retained,renamed_bindings=renamed,before_final_minify_bytes=before}
   session.report.status='success';result.report.stages=session.report.stages;result.trace=session.trace
   return source
   end)
