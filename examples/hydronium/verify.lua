@@ -35,10 +35,10 @@ assert(html:find('Hello &lt;Hydronium&gt;',1,true))
 assert(html:find('Lua &lt; HTML &amp; &quot;escaping&quot;',1,true))
 assert(html:find('q=a&amp;b=c',1,true))
 assert(html==render('Hello <Hydronium>'),'Render state leaked between calls')
-local json=api and api.json or require('hydronium_dom.server.json')
-local style=api and api.style or require('hydronium_dom.style')
-local element=api and api.element or require('hydronium.core.element')
-local server=api and api.server or require(variant=='renderer' and 'hydronium_dom.server.renderer' or 'hydronium_dom.server')
+local json=api and {encode=api.encode,decode=api.decode} or require('hydronium_dom.server.json')
+local style=api and {serialize=api.serialize} or require('hydronium_dom.style')
+local element=api and {h=api.h} or require('hydronium.core.element')
+local server=api and {render_to_string=api.render_to_string} or require(variant=='renderer' and 'hydronium_dom.server.renderer' or 'hydronium_dom.server')
 local checks={html}
 checks[#checks+1]=server.render_to_string(element.h('svg',{},element.h('linearGradient',{strokeWidth=2}),element.h('feGaussianBlur',{})))
 for _,value in ipairs({'escaped " text','Unicode: λ','line\nbreak',''})do
@@ -97,8 +97,31 @@ local element=require('hydronium.core.element')
 local server=require('hydronium_dom.server.renderer')
 local json=require('hydronium_dom.server.json')
 local style=require('hydronium_dom.style')
-return {render=render,element=element,server=server,json=json,style=style}]]
+return {render=render,h=element.h,render_to_string=server.render_to_string,encode=json.encode,decode=json.decode,serialize=style.serialize}]]
   local artifact=q.build({entry='fixture_entry',modules=modules,mode='strict',minify={level='mangle'}})
+  -- Probe real consumer profiles without weakening initializer or export proofs.
+  -- Each attempt is independent: a rejected profile never changes the artifact.
+  for _,candidate in ipairs({
+   {id='hydronium_dom.server.renderer',exports={'render_to_string'}},
+   {id='hydronium.core.element',exports={'h'}},
+   {id='hydronium_dom.style',exports={'serialize','UNITLESS_NUMBER_PROPS','camel_to_kebab'}},
+  })do
+   local accepted,profiled=pcall(q.build,{entry='fixture_entry',modules=modules,mode='strict',
+    facades={[candidate.id]={exports=candidate.exports}},minify={level='mangle'}})
+   if accepted then
+    -- Selection support may improve independently. Execute any accepted result
+    -- against the same baseline before describing its size as a usable win.
+    local directory=temp..'/profile-'..candidate.id
+    local source=q.bundle(profiled);write(directory..'/bundle.lua',source)
+    local success=os.execute(quote(executable)..' '..quote(temp..'/worker.lua')..' '..quote(directory)..' renderer bundle')
+    assert(success==true or success==0,'Profile worker failed: '..candidate.id)
+    assert(read(directory..'/render.html')==baseline,'Profile changed output: '..candidate.id)
+    print(string.format('renderer profile %s: %d verified bundle bytes',candidate.id,#source))
+   else
+    assert(type(profiled)=='table' and profiled.code,'Unstructured profile failure')
+    print('renderer profile '..candidate.id..': '..tostring(profiled))
+   end
+  end
   for _,format in ipairs({'files','bundle'})do
    local directory=temp..'/strict-'..format
    local total,count=0,0

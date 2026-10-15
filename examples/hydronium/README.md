@@ -71,14 +71,31 @@ self-`__index` export proof; registry version 0.1.2 is not sufficient.
 | Original loaded source + page | 154,346 |
 | Compacted loaded source + page | 74,230 |
 | Compacted + JSON/style mangling | 73,112 |
-| Strict mangled module files | 56,269 |
-| Strict standalone bundle | 57,454 |
+| Strict mangled module files | 56,331 |
+| Strict standalone bundle | 57,516 |
 
 The Strict artifacts retain 25 modules, including the page and an explicit
 verification entry. They are emitted from the statically proved dependency graph,
 not from observed loads. Both files and bundle execute in isolated processes on
 Lua 5.4 and LuaJIT and match the original HTML, SVG, JSON, styles, and repeated
-renders. The bundle is approximately 62.8% smaller than the original fixture's
+renders. The bundle is approximately 62.7% smaller than the original fixture's
 loaded source, with the extra verification entry included. No consumer export
 profiles are supplied: unused features inside retained modules remain present.
 Root/site-facing imports still reject reflective compilation or Meteorite paths.
+
+## Consumer-profile safety probes
+
+The runner also attempts independent export profiles for the renderer, element
+construction, and style utility. An accepted profile must execute its bundle
+against the same baseline; a rejected profile reports its structured diagnostic
+and leaves the verified full closure unchanged. The harness exports individual
+functions rather than leaking framework export tables.
+
+Renderer/element selection currently stops at `QV105`: the initializer verifier
+cannot establish the portable compatibility helper's conditional assignments.
+That is a proof limitation, not evidence that the helper has side effects.
+Style selection must include `UNITLESS_NUMBER_PROPS` and `camel_to_kebab` as well
+as `serialize`, because HTML re-exports/uses them. Selecting implementation
+modules also requires a selector richer than Quaver's current static
+require-and-alias facade grammar. Do not bypass these checks with a purity flag
+or delete exported functions by text matching.
