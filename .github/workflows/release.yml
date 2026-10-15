@@ -88,5 +88,17 @@ jobs:
           package_version="${RELEASE_TAG#v}"
           MOONSTONE_ARTIFACT_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/quaver-${package_version}-source.tar.gz"
           export MOONSTONE_ARTIFACT_URL
-          dist/registry/quaver/publish.sh
+          # Public GitHub artifacts must be submitted with explicit visibility.
+          descriptor=$(mktemp)
+          trap 'rm -f "$descriptor"' EXIT
+          awk -v url="$MOONSTONE_ARTIFACT_URL" '
+            /^\[\[artifacts\]\]$/ { in_artifact = 1 }
+            in_artifact && !replaced && /^url = "/ { print "url = \"" url "\""; replaced = 1; next }
+            { print }
+          ' dist/registry/quaver/package.toml > "$descriptor"
+          curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer $MOONSTONE_TOKEN" \
+            -F visibility=public -F descriptor=@"$descriptor" \
+            -F readme=@dist/registry/quaver/README.md \
+            https://registry.moonstone.sh/api/registry/v0/publish
           echo "Moonstone registry package submitted." >> "$GITHUB_STEP_SUMMARY"
