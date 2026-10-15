@@ -55,6 +55,25 @@ function M.verifier(read,options)
   end
   local top_assignments={}
   for _,stmt in ipairs(tree.statements) do if stmt.kind=='Assignment' then top_assignments[stmt]=true end end
+  -- The class idiom (`T.__index=T`, `setmetatable(obj,T)`) makes the exports
+  -- reachable from instances without adding fields beyond `__index`. It is
+  -- accepted only for a local exports table and the unshadowed global.
+  local global_setmetatable=is_table
+  walk(tree,function(n)
+   local names=(n.kind=='Local' or n.kind=='For') and n.names or n.kind=='Function' and n.params or n.kind=='LocalFunction' and {n.name} or {}
+   if n.kind=='Assignment' then names={};for _,target in ipairs(n.targets) do if target.kind=='Identifier' then names[#names+1]=target.name end end end
+   for _,name in ipairs(names) do if name=='setmetatable' then global_setmetatable=false end end
+  end)
+  local function class_use(n,parent)
+   if not is_table or not parent then return false end
+   if parent.kind=='Assignment' and top_assignments[parent] and #parent.targets==1 and parent.values[1]==n then
+    local target=parent.targets[1]
+    local key=target.kind=='Member' and target.key or target.kind=='Index' and target.key.kind=='Literal' and target.key.value
+    return key=='__index' and target.object.kind=='Identifier' and target.object.name==export
+   end
+   return global_setmetatable and parent.kind=='Call' and not parent.method and parent.callee.kind=='Identifier'
+    and parent.callee.name=='setmetatable' and #parent.args==2 and parent.args[2]==n
+  end
   walk(tree,function(n,parent)
    if n.kind=='Assignment' then for _,target in ipairs(n.targets) do if root(target)==export then
     if not top_assignments[n] or target.object==nil or target.object.kind~='Identifier' or not(target.kind=='Member' or (target.kind=='Index' and target.key.kind=='Literal' and type(target.key.value)=='string')) then
@@ -63,6 +82,7 @@ function M.verifier(read,options)
    end end end
    if n.kind=='Identifier' and n.name==export then
     if n==value and parent==returned then return end
+    if class_use(n,parent) then return end
     if not(parent and (parent.kind=='Member' or parent.kind=='Index') and parent.object==n) then
      fail(id,source,n,'QV104','Module exports escape before their structure can be verified.','Keep the exports table private until return, or declare a runtime boundary.')
     end

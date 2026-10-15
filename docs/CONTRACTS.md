@@ -22,6 +22,21 @@ local result = require('quaver.build').build({
 
 The initial verifier accepts a deliberately small model: literal dependency edges, locally constructed exports, static construction of private tables, and effect-free initializer closures made from literals, functions, tables, locals, and verified imports. Verified table dependencies are also checked against mutations and escapes through other retained importers, including facade aliases. A facade profile specifies the intended public surface; Quaver verifies actual consumer reads against it. Aliases selected by the facade are retained automatically.
 
+A locally constructed exports table may also be its instances' metatable, the usual Lua class shape:
+
+```lua
+local ValidationError = {}
+ValidationError.__index = ValidationError
+
+function ValidationError.create(issues)
+  return setmetatable({ issues = issues }, ValidationError)
+end
+
+return ValidationError
+```
+
+The table may appear as the value of a top-level `T.__index = T` and as the second argument of `setmetatable(value, T)`, where `setmetatable` is the unshadowed global. Neither adds fields beyond `__index`: instances read through the table, and their own writes stay on the instance. Every other escape still fails with `QV104`, including `setmetatable(T, mt)` (a metatable on the exports themselves), aliases (`local U = T`), passing `T` to other functions, storing it in other tables, and `__index` assignments inside functions. Facade export selection does not apply to these modules, so no method is ever removed from a class.
+
 `pure=true` grants no permission. Global writes, unknown initializer calls, cyclic initializer proofs, closing variables, unknown external initializer effects, escaping facade bindings, shadowed imports, dynamic indexing, omitted export reads, and deferred export mutation fail with diagnostics. A valid program can fail this narrow model; that is a limitation of the proof system, not evidence of bad architecture.
 
 For example:

@@ -77,6 +77,30 @@ test('facade aliases cannot hide an imported exports-table escape',function()
   lib='local v={} v.module=require("shared") v.alias=v.module v.unused=require("shared").missing return v',shared='return {}'}
  rejects(function()strict(sources,{lib={exports={'alias'}}})end,'QV104')
 end)
+test('class exports may serve as their instances metatable',function()
+ local class='local E={}\nE.__index=E\nfunction E.create(issues)\n local self=setmetatable({},E)\n self.issues=issues\n return self\nend\n'
+  ..'function E:count()return #self.issues end\nfunction E:__tostring()return "errors: "..self:count()end\nreturn E'
+ local result=strict({app='local E=require("validation_error");return function()local err=E.create({1,2});return err:count(),tostring(err)end',
+  validation_error=class})
+ assert(result.modules.validation_error==class)
+ local count,text=assert((loadstring or load)(bundle(result)))()()
+ assert(count==2 and text=='errors: 2',tostring(text))
+ local alias='local E={};E["__index"]=E;function E.new()return setmetatable({},E)end;return E'
+ assert(strict({app='local C=require("cls");return function()return C.new()end',cls=alias}).modules.cls==alias)
+end)
+test('other escapes of a class export still fail',function()
+ for _,source in ipairs({
+  'local E={};E.__index=E;setmetatable(E,{__index=function()end});return E',
+  'local E={};E.parent=E;return E',
+  'local E={};E.__index=E;register(E);return E',
+  'local E={};local U=E;return E',
+  'local E={};function E.new()E.__index=E;return setmetatable({},E)end;return E',
+  'local setmetatable=function(t,m)m.extra=1;return t end;local E={};function E.new()return setmetatable({},E)end;return E',
+  'local E={};function E.new()return setmetatable({},E,E)end;return E',
+  'local E=function()end;E.__index=E;return E'})do
+  rejects(function()strict({app='return require("cls")',cls=source})end,'QV104')
+ end
+end)
 test('strict minification keeps runtime error line numbers',function()
  local source='-- banner\nlocal value=1\n-- comment\n\nerror("same line")\n'
  local function error_line(code)local f=assert((loadstring or load)(code,'@line-test'));local ok,err=pcall(f);assert(not ok);return tostring(err):match('line%-test:(%d+):')end
