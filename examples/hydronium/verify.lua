@@ -21,7 +21,7 @@ for _,member in ipairs({'core','dom','router'})do
  assert(files:close())
 end
 local page=read('examples/hydronium/page.lua')
-local variants={narrow=page,broad=page:gsub("require%('hydronium.core.element'%)","require('hydronium')")}
+local variants={narrow=page,broad=page:gsub("require%('hydronium.core.element'%)","require('hydronium')"),renderer=page:gsub("require%('hydronium_dom.server'%)","require('hydronium_dom.server.renderer')")}
 local temp=os.tmpname();os.remove(temp);assert(os.execute('mkdir -p '..quote(temp)))
 local worker=[=[
 local directory,variant=arg[1],arg[2]
@@ -49,7 +49,9 @@ loaded:close()
 write(temp..'/worker.lua',worker)
 local executable=assert(arg[-1] or arg[0])
 local records={}
-for _,variant in ipairs({'broad','narrow'})do
+local variantNames={'broad','narrow'}
+if inventory['hydronium_dom.server.renderer'] then variantNames[#variantNames+1]='renderer' end
+for _,variant in ipairs(variantNames)do
  inventory.probe=variants[variant]
  local conservative=q.build({entry='probe',modules=inventory,mode='conservative',minify={level='mangle'}})
  assert(conservative.report.preserved and conservative.report.minification.applied=='none')
@@ -84,5 +86,6 @@ for _,variant in ipairs({'broad','narrow'})do
  end
 end
 assert(records['broad-none'].html==records['narrow-none'].html,'Narrow imports changed HTML')
+if records['renderer-none']then assert(records['renderer-none'].html==records['narrow-none'].html,'Plain renderer changed HTML')end
 print('PASS: complete-inventory preservation; escaped and repeated SSR; broad/narrow/compact HTML and helper equivalence')
 assert(os.execute('rm -rf '..quote(temp)))

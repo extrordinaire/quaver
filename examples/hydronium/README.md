@@ -62,3 +62,18 @@ compilation/diagnostic facilities, then attempt export profiles on the resulting
 closed SSR graph. Quaver also needs scope-aware import diagnostics: its current
 lexical scanner can reject a public method named `require` even when it is not
 Lua module loading. Neither limitation should be hidden behind an assumption.
+
+## Renderer-isolation follow-up
+
+When the supplied checkout contains `hydronium_dom.server.renderer`, the runner
+also tests that explicit plain-renderer entrypoint and compares its output with
+the site-facing entrypoint. This capability split is under review in
+[Hydronium #29](https://github.com/moonstone-sh/hydronium/pull/29).
+The plain renderer excludes the lazy Meteorite adapter and Vite/manifest loading;
+its fixture loads 23 framework modules, totaling 73,236 compacted source bytes
+including the page, or 72,118 with JSON/style helper mangling.
+
+With the named-member scanner correction in this branch, Strict dependency
+scanning passes those integration boundaries and stops at export proof for
+`hydronium_dom.server.html`: SVG lookup tables are built by initializer loops
+(`QV104`). This is not permission to assume the loops pure or to delete them.
