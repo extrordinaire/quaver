@@ -1,0 +1,38 @@
+manifest_version = 2
+
+[package]
+name = "quaver"
+version = "0.1.0"
+kind = "lib"
+description = "Modular Lua tree-shaker, minifier, and optimizer for Ballad"
+
+[origin]
+kind = "git"
+url = "https://github.com/extrordinaire/quaver"
+
+[interpreter]
+name = "lua"
+version = "5.4"
+abi = "5.4"
+
+[[registries]]
+name = "moonstone"
+resolver = "moonstone"
+url = "https://registry.moonstone.sh/registry/v0"
+priority = 0
+
+[[dependencies]]
+name = "moonstone/ballad"
+constraint = "^0.4.5"
+role = "tool"
+
+[[dependencies]]
+name = "moonstone/ballad"
+constraint = "^0.4.5"
+role = "dev"
+
+[scripts]
+test = "lua tests/run.lua"
+build-valua = "lua src/main.lua build examples/valua.config.lua valua.bundle.lua"
+example = "ballad play examples/valua.partiture.lua"
+package = "ballad play partiture.lua"

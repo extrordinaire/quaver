@@ -1,0 +1,92 @@
+name: Publish Quaver release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing v* tag to publish after a release-only failure.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate release candidate
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Publish GitHub release and package artifact
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+          path: .ci/quaver
+      - uses: actions/checkout@v4
+        with:
+          repository: moonstone-sh/moonstone
+          ref: ab59713d6a5a014b4f5b84ec7ab07d9e0a44044d
+          path: .ci/moonstone
+      - uses: actions/checkout@v4
+        with:
+          repository: moonstone-sh/valua
+          ref: 253601b7e8841458d62efe4bcdd1f7441a56887b
+          path: .ci/valua
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+      - name: Install Moonstone build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y b3sum zstd
+      - name: Build Moonstone CLI
+        working-directory: .ci/moonstone
+        run: |
+          zig build
+          echo "$GITHUB_WORKSPACE/.ci/moonstone/zig-out/bin" >> "$GITHUB_PATH"
+      - name: Synchronize Quaver
+        working-directory: .ci/quaver
+        run: moon sync
+      - name: Verify tag version
+        working-directory: .ci/quaver
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+        run: test "${RELEASE_TAG#v}" = "$(sed -n 's/^version = \"\(.*\)\"$/\1/p' moonstone.toml | head -n 1)"
+      - name: Build and verify release artifacts
+        working-directory: .ci/quaver
+        run: sh scripts/verify-release-artifact.sh
+      - name: Create GitHub release and upload Ballad package
+        working-directory: .ci/quaver
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+        run: |
+          set -eu
+          artifact_dir=dist/registry/quaver
+          archive="$artifact_dir/quaver-$(sed -n 's/^version = \"\(.*\)\"$/\1/p' moonstone.toml | head -n 1)-source.tar.gz"
+          test -f "$archive"
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || gh release create "$RELEASE_TAG" --title "Quaver $RELEASE_TAG" --generate-notes
+          gh release upload "$RELEASE_TAG" "$archive" "$artifact_dir/package.toml" "$artifact_dir/README.md" "$artifact_dir/publish.sh" --clobber
+      - name: Publish Moonstone registry package when credentials are configured
+        working-directory: .ci/quaver
+        env:
+          MOONSTONE_TOKEN: ${{ secrets.MOONSTONE_TOKEN }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+        run: |
+          if [ -z "$MOONSTONE_TOKEN" ]; then
+            echo "Moonstone registry submission is blocked: repository secret MOONSTONE_TOKEN is not configured."
+            echo "Moonstone registry submission: blocked (MOONSTONE_TOKEN is not configured)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          package_version="${RELEASE_TAG#v}"
+          MOONSTONE_ARTIFACT_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/quaver-${package_version}-source.tar.gz"
+          export MOONSTONE_ARTIFACT_URL
+          dist/registry/quaver/publish.sh
+          echo "Moonstone registry package submitted." >> "$GITHUB_STEP_SUMMARY"
