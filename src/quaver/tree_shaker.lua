@@ -17,9 +17,9 @@ local function requires(source, id)
     if t.kind=='name' and forbidden[t.text] and not table_key and before~='.' and before~=':' then
       error(id..': reflective/dynamic Lua is unsupported ('..t.text..')',0)
     end
-    if t.kind=='name' and t.text=='require' then
-      local previous=ts[i-1] and ts[i-1].text
-      if previous=='.' or previous==':' then error(id..': indirect require is unsupported',0) end
+    -- A member named require is an ordinary API field, not the Lua loader.
+    -- Bare references still reject aliasing and dynamic import arguments.
+    if t.kind=='name' and t.text=='require' and before~='.' and before~=':' and not table_key then
       local argument=ts[i+1];local last=i+1
       if argument and argument.text=='(' then argument=ts[i+2];last=i+3
         if not ts[last] or ts[last].text~=')' then error(id..': require must have one literal argument',0) end

@@ -87,6 +87,9 @@ p.sink.directory(optimized, {out='dist/valua',incremental=true})
 
 The adapter consumes declared `.lua` assets, preserves transformed `asset.content` in preference to reading its original file, and emits module files by default, or an explicitly requested strict bundle, plus text and data reports. The transform currently reruns so local compiler edits cannot reuse stale output; the incremental sink preserves unchanged output files. Enabling transform caching needs a declared compiler fingerprint. Module ids preserve explicit `init` names: Valua's `valua.lua` forwards to the facade at `valua.init`.
 
+See the [Hydronium SSR experiment](examples/hydronium/README.md) for measured
+root versus narrow imports, compaction, helper mangling, and current Strict blockers.
+
 ## Safety and current scope
 
 Conservative mode is the default: it preserves every supplied module byte-for-byte. Strict mode requires literal dependency edges, verifies stable exports and initializer effects, and checks that actual facade consumers use only the selected exports. `pure=true` cannot substitute for a proof. Unproven contracts produce structured diagnostics with locations and repair suggestions.

@@ -31,6 +31,17 @@ local exports={'object','pipe','string','min_length','optional','number','safe_p
 local profile={['valua.init']={pure=true,exports=exports}}
 valua.app=read('examples/app.lua')
 local result=build({entry='app',modules=valua,facades=profile})
+test('dependency scanning distinguishes require methods from the Lua loader',function()
+ local source='local host={} function host.require(name) return name end;return function() return host.require("capability") end'
+ local deps=require('quaver.tree_shaker').requires(source,'host')
+ assert(#deps==0)
+ local built=q.build({mode='strict',entry='host',modules={host=source},minify={level='mangle'}})
+ assert(chunk(q.bundle(built))()()=='capability')
+ local literal=require('quaver.tree_shaker').requires('local api=require("api");return api.require("capability")','app')
+ assert(#literal==1 and literal[1]=='api')
+ fails(function()require('quaver.tree_shaker').requires('local alias=require;return alias("missing")','app')end,'dynamic/aliased require')
+ fails(function()require('quaver.tree_shaker').requires('local methods={require=require};return methods.require("missing")','app')end,'dynamic/aliased require')
+end)
 test('Valua selection removes unused primitives and tooling',function()
   assert(not result.modules['valua.schemas.union'])
   assert(not result.modules['valua.contracts'])
